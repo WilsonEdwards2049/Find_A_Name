@@ -369,12 +369,13 @@
   }
 
   function renderExamplesInto(panel, subtitle, strip) {
-    if (!state.toneOption || !state.surname) {
+    const toneOption = state.toneOption || state.toneOptions[0] || null;
+    if (!toneOption || !state.surname) {
       panel.hidden = true;
       return;
     }
     const examples = ENGINE.getNamingExamples(
-      state.toneOption.givenTones,
+      toneOption.givenTones,
       state.nameLength,
       3
     );
@@ -384,12 +385,12 @@
     }
     const surnameText = state.surname.text;
     const fullToneNames = state.surname.tones
-      .concat(state.toneOption.givenTones)
+      .concat(toneOption.givenTones)
       .map(ENGINE.toneName)
       .join(" · ");
     const typeLabels = { 史: "历史人物", 文: "文学形象", 诗: "诗文意象" };
-    subtitle.textContent = "与「" + surnameText + "」连读 · 全名声调 " +
-      fullToneNames;
+    subtitle.textContent = (state.toneOption ? "" : "默认展示最高分声调 · ") +
+      "与「" + surnameText + "」连读 · 全名声调 " + fullToneNames;
     strip.innerHTML = examples.map(function (example) {
       return '<article class="example-card">' +
         '<div class="example-top"><span class="example-name">' +
