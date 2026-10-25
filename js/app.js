@@ -409,7 +409,8 @@
       .map(ENGINE.toneName)
       .join(" · ");
     const typeLabels = { 史: "历史人物", 文: "文学形象", 诗: "诗文意象" };
-    subtitle.textContent = (state.toneOption ? "" : "默认展示有名例的声调 · ") +
+    subtitle.textContent = (state.toneOption ? "" :
+      (examples.length ? "默认展示有名例的声调 · " : "默认展示最高分声调 · ")) +
       "与「" + surnameText + "」同姓 · 全名声调 " + fullToneNames;
     if (!examples.length) {
       strip.innerHTML = '<p class="examples-empty">暂无与「' + esc(surnameText) +
