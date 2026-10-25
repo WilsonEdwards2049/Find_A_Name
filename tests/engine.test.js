@@ -312,7 +312,7 @@ test("imagery availability covers every category", function () {
 });
 
 test("naming examples cover every tone pattern", function () {
-  assert.strictEqual(DATA.namingExamples.length, 60);
+  assert(DATA.namingExamples.length >= 100);
   const validTypes = new Set(["史", "文", "诗"]);
   DATA.namingExamples.forEach(function (example) {
     const tokens = example.pinyin.split(/\s+/);
@@ -335,8 +335,10 @@ test("naming examples cover every tone pattern", function () {
   });
 
   for (let tone = 1; tone <= 4; tone += 1) {
-    const single = ENGINE.getNamingExamples([tone], 1, 3);
-    assert.strictEqual(single.length, 3, "single tone " + tone);
+    const single = ENGINE.getNamingExamples([tone], 1, 5);
+    assert(single.length >= 3, "single tone " + tone);
+    assert(single.filter(function (example) { return example.fullName; }).length >= 3,
+      "single tone " + tone + " full names");
     single.forEach(function (example) {
       assert.strictEqual(example.length, 1);
       assert.strictEqual(example.tones[0], tone);
@@ -345,9 +347,11 @@ test("naming examples cover every tone pattern", function () {
 
   for (let first = 1; first <= 4; first += 1) {
     for (let second = 1; second <= 4; second += 1) {
-      const examples = ENGINE.getNamingExamples([first, second], 2, 3);
-      assert.strictEqual(examples.length, 3, "double tones " + first + second);
-      examples.forEach(function (example) {
+      const examples = ENGINE.getNamingExamples([first, second], 2, 20);
+      assert(examples.length >= 3, "double tones " + first + second);
+      assert(examples.filter(function (example) { return example.fullName; }).length >= 3,
+        "double tones " + first + second + " full names");
+      examples.slice(0, 3).forEach(function (example) {
         assert.strictEqual(example.length, 2);
         assert.deepStrictEqual(example.tones, [first, second]);
         assert(example.pinyinDisplay.length > 0);
@@ -364,7 +368,14 @@ test("surname examples require the exact same surname", function () {
   assert.strictEqual(baoChai[0].fullPinyinDisplay, "xuē bǎo chāi");
 
   const wang = ENGINE.resolveSurname("王");
-  assert.deepStrictEqual(ENGINE.getSurnameExamples(wang, [3, 1], 2, 3), []);
+  const wangExamples = ENGINE.getSurnameExamples(wang, [3, 1], 2, 3);
+  assert(wangExamples.length >= 1);
+  wangExamples.forEach(function (example) {
+    assert.strictEqual(example.surname, "王");
+    assert.notStrictEqual(example.fullName, "薛宝钗");
+  });
+  const zhaoJun = ENGINE.getSurnameExamples(wang, [1, 1], 2, 3);
+  assert(zhaoJun.some(function (example) { return example.fullName === "王昭君"; }));
 
   const zhang = ENGINE.resolveSurname("张");
   const ziFang = ENGINE.getSurnameExamples(zhang, [3, 2], 2, 3);

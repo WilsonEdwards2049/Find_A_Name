@@ -396,33 +396,55 @@
       return;
     }
     const collect = function (option) {
-      return ENGINE.getSurnameExamples(
+      const own = ENGINE.getSurnameExamples(
         state.surname,
         option.givenTones,
         state.nameLength,
         3
       );
+      if (own.length >= 3) return { own: own, examples: own.slice(0, 3) };
+      const used = {};
+      own.forEach(function (example) { used[example.fullName] = true; });
+      const extras = ENGINE.getNamingExamples(
+        option.givenTones,
+        state.nameLength,
+        20
+      ).filter(function (example) {
+        return example.fullName &&
+          !used[example.fullName] &&
+          example.surname !== state.surname.text;
+      });
+      return { own: own, examples: own.concat(extras).slice(0, 3) };
     };
     let toneOption = state.toneOption || null;
-    let examples = [];
+    let collected = { own: [], examples: [] };
     if (toneOption) {
-      examples = collect(toneOption);
+      collected = collect(toneOption);
     } else {
       // 未选声调时优先预览确有名例的声调，避免默认落在无同姓名例的组合上。
       toneOption = state.toneOptions.find(function (option) {
-        return collect(option).length > 0;
+        return collect(option).own.length > 0;
       }) || state.toneOptions[0];
-      examples = collect(toneOption);
+      collected = collect(toneOption);
     }
+    const examples = collected.examples;
+    const ownCount = collected.own.length;
     const surnameText = state.surname.text;
     const fullToneNames = state.surname.tones
       .concat(toneOption.givenTones)
       .map(ENGINE.toneName)
       .join(" · ");
     const typeLabels = { 史: "历史人物", 文: "文学形象", 诗: "诗文意象" };
+    let subtitleText = "全名声调 " + fullToneNames;
+    if (ownCount) {
+      subtitleText = "与「" + surnameText + "」同姓 " + ownCount + " 例 · " + subtitleText;
+      if (examples.length > ownCount) subtitleText += " · 补入原姓名例";
+    } else {
+      subtitleText = "暂无与「" + surnameText + "」同姓的名例 · 以下保留原姓 · " +
+        subtitleText;
+    }
     subtitle.textContent = (state.toneOption ? "" :
-      (examples.length ? "默认展示有名例的声调 · " : "默认展示最高分声调 · ")) +
-      "与「" + surnameText + "」同姓 · 全名声调 " + fullToneNames;
+      (ownCount ? "默认展示有名例的声调 · " : "默认展示最高分声调 · ")) + subtitleText;
     if (!examples.length) {
       strip.innerHTML = '<p class="examples-empty">暂无与「' + esc(surnameText) +
         "」同姓、且名内声调为 " + esc(toneOption.givenTones.join(" · ")) +
