@@ -1310,6 +1310,17 @@ button:disabled {
   overflow: hidden;
 }
 
+/* 第三步的声调名例固定在视口顶部，滚动挑音节时始终可见。 */
+#examples-panel {
+  position: sticky;
+  top: 14px;
+  z-index: 8;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.46)),
+    var(--paper-bright);
+  box-shadow: 0 12px 30px rgba(44, 43, 31, 0.08);
+}
+
 .examples-panel::before {
   content: "";
   position: absolute;
@@ -2911,6 +2922,10 @@ button:disabled {
   .examples-panel {
     padding: 13px 13px 11px;
     margin-bottom: 14px;
+  }
+
+  #examples-panel {
+    top: 8px;
   }
 
   .examples-head {
