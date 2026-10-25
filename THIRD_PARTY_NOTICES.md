@@ -1,8 +1,9 @@
 # Third-party notices
 
 `js/data.js` includes generated character glosses and readings derived from the
-following projects. The generated block is produced by `scripts/build-characters.cjs`;
-the original data files are downloaded at build time and are not committed.
+following projects. The generated blocks are produced by
+`scripts/build-characters.cjs` and `scripts/build-example-fills.cjs`; the original
+data files are downloaded at build time and are not committed.
 
 ## General Standard Chinese Characters
 
@@ -26,8 +27,9 @@ the original data files are downloaded at build time and are not committed.
 - Commit: `47d4af8d816f6212787ddfc49173cac3b994b58d`
 - File: `Chinese_Names_Corpus/Chinese_Names_Corpus（120W）.txt`
 - License: Apache License 2.0
-- Use: build-time frequency counting only, to decide which level-1 characters
-  are suitable for given names. No corpus names are shipped at runtime.
+- Use: build-time frequency counting to decide which level-1 characters are
+  suitable for given names, and real same-surname name examples for tone
+  combinations that have no curated example.
 
 ## Manual overrides
 

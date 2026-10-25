@@ -20,6 +20,7 @@
       step: 1,
       surname: null,
       nameLength: 2,
+      lengthAutoAdjusted: false,
       toneOptions: [],
       toneOption: null,
       syllableCacheKey: "",
@@ -284,6 +285,21 @@
     }
 
     state.surname = resolved;
+    if (isNewSurname) {
+      // 没有该长度的同姓名例时，切到确有例子的长度，避免名例面板空白。
+      const hasLengthExamples = function (length) {
+        return ENGINE.buildToneOptions(resolved.syllables, length).some(function (option) {
+          return ENGINE.getSurnameExamples(resolved, option.givenTones, length, 1).length > 0;
+        });
+      };
+      const otherLength = state.nameLength === 1 ? 2 : 1;
+      state.lengthAutoAdjusted = false;
+      if (!hasLengthExamples(state.nameLength) && hasLengthExamples(otherLength)) {
+        state.nameLength = otherLength;
+        state.lengthAutoAdjusted = true;
+      }
+      updateLengthButtons();
+    }
     clearError();
     els.manualReading.hidden = true;
     els.surnameReading.textContent = resolved.pinyin;
@@ -306,9 +322,14 @@
     const surnameLength = state.surname.syllables.length;
     els.toneSurname.textContent = state.surname.text;
     els.toneContextName.textContent = state.surname.text + " · " + state.surname.pinyin;
-    els.toneContextLength.textContent = state.nameLength === 1
+    const autoNote = state.lengthAutoAdjusted
+      ? (state.nameLength === 1
+        ? "（该姓氏暂无双字名例，已切换为单字名）"
+        : "（该姓氏暂无单字名例，已切换为双字名）")
+      : "";
+    els.toneContextLength.textContent = (state.nameLength === 1
       ? "单字名，需要选择一个声调"
-      : "双字名，需要选择一个“声调 + 声调”组合";
+      : "双字名，需要选择一个“声调 + 声调”组合") + autoNote;
     els.toneGrid.innerHTML = state.toneOptions.map(function (option, index) {
       const selected = state.toneOption === option ||
         (state.toneOption && toneKey(state.toneOption) === toneKey(option));
@@ -396,59 +417,39 @@
       return;
     }
     const collect = function (option) {
-      const own = ENGINE.getSurnameExamples(
+      return ENGINE.getSurnameExamples(
         state.surname,
         option.givenTones,
         state.nameLength,
         3
       );
-      if (own.length) return { examples: own, fallback: false };
-      return {
-        examples: ENGINE.getToneMatchedExamples(
-          state.surname,
-          option.givenTones,
-          state.nameLength,
-          3
-        ),
-        fallback: true
-      };
     };
     let toneOption = state.toneOption || null;
-    let collected = { examples: [], fallback: false };
+    let examples = [];
     if (toneOption) {
-      collected = collect(toneOption);
+      examples = collect(toneOption);
     } else {
       // 未选声调时优先预览确有同姓名例的声调，避免默认落在没有同姓名例的组合上。
       toneOption = state.toneOptions.find(function (option) {
-        return ENGINE.getSurnameExamples(
-          state.surname,
-          option.givenTones,
-          state.nameLength,
-          1
-        ).length > 0;
+        return collect(option).length > 0;
       }) || state.toneOptions[0];
-      collected = collect(toneOption);
+      examples = collect(toneOption);
     }
-    const examples = collected.examples;
-    const fallback = collected.fallback;
     const surnameText = state.surname.text;
     const fullToneNames = state.surname.tones
       .concat(toneOption.givenTones)
       .map(ENGINE.toneName)
       .join(" · ");
     let subtitleText = "全名声调 " + fullToneNames;
-    if (!fallback) {
+    if (examples.length) {
       subtitleText = "与「" + surnameText + "」同姓 " + examples.length + " 例 · " + subtitleText;
-    } else if (examples.length) {
-      subtitleText = "暂无与「" + surnameText +
-        "」同姓的名例 · 以下为同调原名（不改姓） · " + subtitleText;
     }
     subtitle.textContent = (state.toneOption ? "" :
-      (fallback ? "默认展示最高分声调 · " : "默认展示有名例的声调 · ")) + subtitleText;
+      (examples.length ? "默认展示有名例的声调 · " : "默认展示最高分声调 · ")) + subtitleText;
     if (!examples.length) {
       strip.innerHTML = '<p class="examples-empty">暂无与「' + esc(surnameText) +
         "」同姓、且名内声调为 " + esc(toneOption.givenTones.join(" · ")) +
-        " 的名例。换个声调或姓氏再看看。</p>";
+        " 的名例。换个声调即可，不会用其他姓氏替代。</p>";
       panel.hidden = false;
       return;
     }
@@ -456,9 +457,8 @@
       return '<article class="example-card">' +
         '<div class="example-top"><span class="example-name">' +
         esc(example.fullName) +
-        '</span><span class="example-type" title="' +
-        esc(fallback ? "全名声调相同、保留原姓" : "与输入姓氏同名") +
-        '">' + esc((fallback ? "同调" : "同姓") + " · " + example.type) +
+        '</span><span class="example-type" title="与输入姓氏同名">' +
+        esc("同姓 · " + example.type) +
         "</span></div>" +
         '<div class="example-pinyin">' + esc(example.fullPinyinDisplay) + "</div>" +
         '<div class="example-origin">名例 · ' + esc(example.origin) + "</div>" +
@@ -1039,6 +1039,7 @@
       const length = Number(button.dataset.length);
       if (length === state.nameLength) return;
       state.nameLength = length;
+      state.lengthAutoAdjusted = false;
       state.toneOptions = [];
       state.toneOption = null;
       state.syllableCacheKey = "";

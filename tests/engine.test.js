@@ -313,7 +313,7 @@ test("imagery availability covers every category", function () {
 
 test("naming examples cover every tone pattern", function () {
   assert(DATA.namingExamples.length >= 100);
-  const validTypes = new Set(["史", "文", "诗"]);
+  const validTypes = new Set(["史", "文", "诗", "名"]);
   DATA.namingExamples.forEach(function (example) {
     const tokens = example.pinyin.split(/\s+/);
     assert.strictEqual(tokens.length, Array.from(example.given).length, example.given);
@@ -435,6 +435,63 @@ test("张 has three same-surname examples for every full-name tone pattern", fun
       });
     }
   }
+});
+
+test("夏 has a same-surname example for every full-name tone pattern", function () {
+  const xia = ENGINE.resolveSurname("夏");
+  for (let first = 1; first <= 4; first++) {
+    const single = ENGINE.getSurnameExamples(xia, [first], 1, 10);
+    assert(single.length >= 1, "1|" + first);
+    single.forEach(function (example) {
+      assert.strictEqual(example.surname, "夏");
+    });
+    for (let second = 1; second <= 4; second++) {
+      const list = ENGINE.getSurnameExamples(xia, [first, second], 2, 10);
+      assert(list.length >= 1, "1|" + first + "-" + second);
+      list.forEach(function (example) {
+        assert.strictEqual(example.surname, "夏");
+      });
+    }
+  }
+});
+
+test("every surname has at least one same-surname example", function () {
+  const texts = Object.keys(DATA.surnames).concat(Object.keys(DATA.compoundSurnames));
+  texts.forEach(function (text) {
+    const surname = ENGINE.resolveSurname(text);
+    let found = false;
+    for (let first = 1; first <= 4 && !found; first++) {
+      if (ENGINE.getSurnameExamples(surname, [first], 1, 1).length) {
+        found = true;
+        break;
+      }
+      for (let second = 1; second <= 4 && !found; second++) {
+        if (ENGINE.getSurnameExamples(surname, [first, second], 2, 1).length) {
+          found = true;
+        }
+      }
+    }
+    assert(found, text);
+  });
+});
+
+test("common surnames have same-surname examples for every tone pattern", function () {
+  const common = [
+    "王", "李", "张", "刘", "陈", "杨", "黄", "赵", "吴", "周",
+    "徐", "孙", "马", "朱", "胡", "郭", "何", "高", "林", "罗"
+  ];
+  common.forEach(function (text) {
+    const surname = ENGINE.resolveSurname(text);
+    for (let first = 1; first <= 4; first++) {
+      assert(ENGINE.getSurnameExamples(surname, [first], 1, 1).length === 1,
+        text + " 1|" + first);
+      for (let second = 1; second <= 4; second++) {
+        const list = ENGINE.getSurnameExamples(surname, [first, second], 2, 1);
+        assert(list.length === 1, text + " 1|" + first + "-" + second);
+        assert.strictEqual(list[0].surname, text);
+      }
+    }
+  });
 });
 
 test("double-character recommendations are coherent", function () {
