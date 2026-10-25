@@ -151,7 +151,15 @@
             <span id="tone-context-length">双字名，需要选择一个“声调 + 声调”组合</span>
           </div>
 
-          <div class="tone-grid" id="tone-grid"></div>
+          <div class="stage-actions is-top">
+            <button class="ghost-button back-button" type="button" data-goto="1">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H6M11 6l-6 6 6 6"/></svg>返回姓氏
+            </button>
+            <button class="primary-button" type="button" id="tone-continue" disabled>
+              查看候选音节
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
+            </button>
+          </div>
 
           <section class="examples-panel" id="tone-examples-panel" aria-labelledby="tone-examples-title" hidden>
             <div class="examples-head">
@@ -165,6 +173,8 @@
             <p class="examples-foot">姓氏取你所填，与名例组合试读；拼音与声调按普通话标注，出处保留原人物。</p>
           </section>
 
+          <div class="tone-grid" id="tone-grid"></div>
+
           <details class="scoring-details">
             <summary>声调评分如何计算</summary>
             <div class="scoring-copy">
@@ -172,16 +182,6 @@
               <p>评分是听觉审美参考，不代表吉凶，也不与生辰、五行绑定。你可以完全按自己的喜好选择。</p>
             </div>
           </details>
-
-          <div class="stage-actions">
-            <button class="ghost-button back-button" type="button" data-goto="1">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H6M11 6l-6 6 6 6"/></svg>返回姓氏
-            </button>
-            <button class="primary-button" type="button" id="tone-continue" disabled>
-              查看候选音节
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
-            </button>
-          </div>
         </section>
 
         <section class="step-panel" data-step="3" id="step-3" hidden>

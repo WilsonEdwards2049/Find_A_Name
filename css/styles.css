@@ -1220,6 +1220,15 @@ button:disabled {
   border-top: 1px solid var(--line);
 }
 
+.stage-actions.is-top {
+  margin-top: 0;
+  margin-bottom: 18px;
+  padding-top: 0;
+  padding-bottom: 16px;
+  border-top: 0;
+  border-bottom: 1px solid var(--line);
+}
+
 /* Syllable step */
 .toolbar {
   display: flex;
