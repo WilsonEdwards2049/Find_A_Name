@@ -76,6 +76,37 @@
     return syllable.slice(getInitial(syllable).length);
   }
 
+  const INITIAL_FAMILY_GROUPS = {
+    zh: "z", z: "z",
+    ch: "c", c: "c",
+    sh: "s", s: "s",
+    n: "l", l: "l"
+  };
+
+  const FINAL_RHYME_GROUPS = {
+    a: "a", ia: "a", ua: "a",
+    o: "o", e: "o", uo: "o",
+    ie: "ie", ve: "ie", ue: "ie",
+    i: "i", v: "i", er: "i",
+    u: "u",
+    ai: "ai", uai: "ai",
+    ei: "ei", ui: "ei",
+    ao: "ao", iao: "ao",
+    ou: "ou", iu: "ou",
+    an: "an", ian: "an", uan: "an", van: "an",
+    en: "en", in: "en", un: "en", vn: "en",
+    ang: "ang", iang: "ang", uang: "ang",
+    eng: "eng", ing: "eng", ong: "eng", iong: "eng"
+  };
+
+  function initialFamily(initial) {
+    return INITIAL_FAMILY_GROUPS[initial] || initial;
+  }
+
+  function finalFamily(final) {
+    return FINAL_RHYME_GROUPS[final] || final;
+  }
+
   function toneName(tone) {
     return TONE_INFO[tone].name;
   }
@@ -323,6 +354,8 @@
     const syllables = fullSyllables.map(function (item) { return item.syllable; });
     const initials = syllables.map(getInitial);
     const finals = syllables.map(getFinal);
+    const initialFamilies = initials.map(initialFamily);
+    const finalFamilies = finals.map(finalFamily);
     let score = 82;
     const reasons = [];
 
@@ -331,6 +364,10 @@
     let adjacentSameFinal = 0;
     let nonAdjacentInitial = 0;
     let nonAdjacentFinal = 0;
+    let adjacentFamilyInitial = 0;
+    let adjacentFamilyFinal = 0;
+    let nonAdjacentFamilyInitial = 0;
+    let nonAdjacentFamilyFinal = 0;
 
     for (let i = 0; i < n; i += 1) {
       for (let j = i + 1; j < n; j += 1) {
@@ -340,10 +377,16 @@
         if (initials[i] && initials[i] === initials[j]) {
           if (j === i + 1) adjacentSameInitial += 1;
           else nonAdjacentInitial += 1;
+        } else if (initialFamilies[i] && initialFamilies[i] === initialFamilies[j]) {
+          if (j === i + 1) adjacentFamilyInitial += 1;
+          else nonAdjacentFamilyInitial += 1;
         }
         if (finals[i] && finals[i] === finals[j]) {
           if (j === i + 1) adjacentSameFinal += 1;
           else nonAdjacentFinal += 1;
+        } else if (finalFamilies[i] && finalFamilies[i] === finalFamilies[j]) {
+          if (j === i + 1) adjacentFamilyFinal += 1;
+          else nonAdjacentFamilyFinal += 1;
         }
       }
     }
@@ -360,11 +403,25 @@
       score -= adjacentSameFinal * 9;
       reasons.push({ type: "minus", text: "相邻韵母相同" });
     }
+    if (adjacentFamilyInitial) {
+      score -= adjacentFamilyInitial * 3;
+      reasons.push({ type: "minus", text: "相邻声母相近" });
+    }
+    if (adjacentFamilyFinal) {
+      score -= adjacentFamilyFinal * 3;
+      reasons.push({ type: "minus", text: "相邻韵母相近" });
+    }
     if (nonAdjacentInitial) {
       score -= nonAdjacentInitial * 2;
     }
     if (nonAdjacentFinal) {
       score -= nonAdjacentFinal * 3;
+    }
+    if (nonAdjacentFamilyInitial) {
+      score -= nonAdjacentFamilyInitial;
+    }
+    if (nonAdjacentFamilyFinal) {
+      score -= nonAdjacentFamilyFinal;
     }
 
     const initialVariety = uniqueCount(initials);
@@ -397,14 +454,17 @@
       return pool.filter(function (entry) { return !entry.lowPriority; }).length;
     });
     const minSupport = Math.min.apply(null, coreSupport);
+    const avgSupport = coreSupport.reduce(function (sum, count) {
+      return sum + count;
+    }, 0) / Math.max(coreSupport.length, 1);
+    let supportBonus = minSupport * 0.45 + avgSupport * 0.45 - 2.4;
+    if (minSupport <= 1) supportBonus -= 2.5;
+    score += clamp(supportBonus, -6, 7);
     if (minSupport <= 1) {
-      score -= 6;
-      reasons.push({ type: "minus", text: "可用字较少" });
+      reasons.push({ type: "minus", text: "可用适名字较少" });
     } else if (minSupport >= 8) {
-      score += 4;
       reasons.push({ type: "plus", text: "用字选择充足" });
     } else if (minSupport >= 4) {
-      score += 2;
       reasons.push({ type: "plus", text: "用字有余地" });
     }
 

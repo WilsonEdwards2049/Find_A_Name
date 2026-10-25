@@ -194,6 +194,14 @@ test("syllable options: tone matching, ranking and search coverage", function ()
     assert.strictEqual(options[i].givenSyllables[1].tone, 2);
   }
 
+  const firstPageScores = options.slice(0, 12).map(function (option) {
+    return option.score;
+  });
+  assert(new Set(firstPageScores).size > 1, "top syllable options should not share one score");
+  assert(new Set(options.map(function (option) {
+    return option.score;
+  })).size >= 8, "syllable scores should have a usable spread");
+
   const yongLing = options.find(function (option) {
     return option.givenSyllables[0].syllable === "yong" &&
       option.givenSyllables[1].syllable === "ling";
