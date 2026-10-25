@@ -351,11 +351,22 @@
     els.syllableSearch.value = "";
   }
 
+  function matchesSyllableQuery(option, query) {
+    // 拼音按音节精确匹配；汉字仍按包含关系搜索。
+    if (/^[a-z]+$/.test(query)) {
+      const syllables = option.givenSyllables.map(function (item) {
+        return item.syllable;
+      });
+      return syllables.indexOf(query) !== -1 || syllables.join("") === query;
+    }
+    return normalizeQuery(option.searchText).indexOf(query) !== -1;
+  }
+
   function filteredSyllables() {
     const query = normalizeQuery(state.syllableQuery);
     if (!query) return state.syllableOptions;
     return state.syllableOptions.filter(function (option) {
-      return normalizeQuery(option.searchText).indexOf(query) !== -1;
+      return matchesSyllableQuery(option, query);
     });
   }
 
