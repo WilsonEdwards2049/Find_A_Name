@@ -1310,7 +1310,8 @@ button:disabled {
   overflow: hidden;
 }
 
-/* 第三步的声调名例固定在视口顶部，滚动挑音节时始终可见。 */
+/* 第二、三步的姓名名例固定在视口顶部，滚动选项时始终可见。 */
+#tone-examples-panel,
 #examples-panel {
   position: sticky;
   top: 14px;
@@ -2924,6 +2925,7 @@ button:disabled {
     margin-bottom: 14px;
   }
 
+  #tone-examples-panel,
   #examples-panel {
     top: 8px;
   }
