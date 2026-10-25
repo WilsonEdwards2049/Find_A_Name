@@ -1482,6 +1482,31 @@ button:disabled {
   background: var(--vermilion);
 }
 
+.syllable-card.is-dictionary {
+  border-style: dashed;
+  background: rgba(255, 255, 255, 0.16);
+  cursor: not-allowed;
+}
+
+.syllable-card.is-dictionary:hover {
+  border-color: var(--line);
+  background: rgba(255, 255, 255, 0.16);
+  transform: none;
+}
+
+.syllable-card.is-dictionary .syllable-pinyin,
+.syllable-card.is-dictionary .syllable-samples {
+  color: var(--muted);
+}
+
+.syllable-dict {
+  grid-column: 1 / -1;
+  margin-bottom: 2px;
+  color: var(--vermilion);
+  font-size: 8px;
+  letter-spacing: 0.08em;
+}
+
 .syllable-main {
   display: block;
   min-width: 0;

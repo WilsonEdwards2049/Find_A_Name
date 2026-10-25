@@ -41,7 +41,7 @@ function findSyllableOption(surname, givenTones, first, second) {
 }
 
 test("data: character rows are unique and tagged", function () {
-  assert(DATA.characters.length >= 400);
+  assert(DATA.characters.length >= 3500);
   const validTags = new Set(DATA.imagery.map(function (item) { return item.id; }));
   const seen = new Set();
   DATA.characters.forEach(function (entry) {
@@ -49,11 +49,53 @@ test("data: character rows are unique and tagged", function () {
     assert(entry.tone >= 1 && entry.tone <= 4, entry.char + " tone");
     assert(!seen.has(entry.char + entry.pinyin), "duplicate " + entry.char + entry.pinyin);
     seen.add(entry.char + entry.pinyin);
-    assert(entry.tags.length > 0, entry.char + " tags");
+    if (entry.nameable) {
+      assert(entry.tags.length > 0, entry.char + " nameable tags");
+      assert(entry.meaning && entry.meaning.trim(), entry.char + " nameable meaning");
+    }
     entry.tags.forEach(function (tag) {
       assert(validTags.has(tag), entry.char + " invalid tag " + tag);
     });
   });
+});
+
+test("data: level-1 coverage and nameability", function () {
+  const uniqueChars = new Set(DATA.characters.map(function (entry) { return entry.char; }));
+  assert(uniqueChars.size >= 3500, "unique chars " + uniqueChars.size);
+  ["商", "尚", "赏", "铝", "刁", "死", "病", "非", "我"].forEach(function (char) {
+    assert(uniqueChars.has(char), char + " should be in the dictionary");
+  });
+
+  const nameableChars = new Set(
+    DATA.characters.filter(function (entry) { return entry.nameable; })
+      .map(function (entry) { return entry.char; })
+  );
+  assert(nameableChars.size >= 3500, "nameable chars " + nameableChars.size);
+  ["商", "尚", "清", "玉", "乐", "非", "我"].forEach(function (char) {
+    assert(nameableChars.has(char), char + " should be nameable");
+  });
+
+  ["非", "我", "死", "病", "的", "不", "二", "忌", "愚", "党", "刁", "赏"].forEach(function (char) {
+    const entry = DATA.characters.find(function (row) {
+      return row.char === char && row.nameable;
+    });
+    assert(entry, char + " should remain nameable (low priority)");
+    assert.strictEqual(entry.lowPriority, true, char + " should be low priority");
+  });
+
+  const le = DATA.characters.filter(function (entry) { return entry.char === "乐"; });
+  assert(le.some(function (entry) { return entry.pinyin === "le4" && entry.nameable; }));
+  assert(le.some(function (entry) { return entry.pinyin === "yue4" && entry.nameable; }));
+  assert(le.every(function (entry) {
+    return entry.pinyin === "le4" || entry.pinyin === "yue4" || !entry.nameable;
+  }), "secondary 乐 readings stay non-nameable");
+
+  const qing = DATA.characters.find(function (entry) {
+    return entry.char === "清" && entry.pinyin === "qing1";
+  });
+  assert.strictEqual(qing.meaning, "水体澄澈明净；引申为清朗高洁。");
+  assert.deepStrictEqual(qing.tags, ["water", "cool", "virtue"]);
+  assert.strictEqual(qing.lowPriority, false);
 });
 
 test("data: surnames and compounds parse", function () {
@@ -157,6 +199,26 @@ test("syllable options: tone matching, ranking and search coverage", function ()
       option.givenSyllables[1].syllable === "ling";
   });
   assert(yongLing);
+  assert.strictEqual(yongLing.selectable, true);
+  const namingYong = DATA.namingBySyllableTone.yong3;
+  const namingLing = DATA.namingBySyllableTone.ling2;
+  assert.deepStrictEqual(yongLing.support, [namingYong.length, namingLing.length]);
+  assert.deepStrictEqual(yongLing.coreSupport, [
+    namingYong.filter(function (entry) { return !entry.lowPriority; }).length,
+    namingLing.filter(function (entry) { return !entry.lowPriority; }).length
+  ]);
+  yongLing.samples.forEach(function (chars, index) {
+    const pool = index === 0 ? namingYong : namingLing;
+    const normal = pool.filter(function (entry) { return !entry.lowPriority; });
+    chars.forEach(function (char) {
+      assert(pool.some(function (entry) { return entry.char === char; }),
+        char + " sample is missing from the pool");
+      if (normal.length) {
+        assert(normal.some(function (entry) { return entry.char === char; }),
+          char + " sample should prefer normal-priority chars");
+      }
+    });
+  });
   const poolChars = DATA.bySyllableTone.yong3.concat(DATA.bySyllableTone.ling2)
     .map(function (entry) { return entry.char; }).join("");
   poolChars.split("").forEach(function (char) {
@@ -166,6 +228,58 @@ test("syllable options: tone matching, ranking and search coverage", function ()
   const qingYu = findSyllableOption(zhang, [1, 4], "qing", "yu");
   assert(qingYu, "qing yu should exist");
   assert.strictEqual(qingYu.givenPinyin, "qīng yù");
+
+  const single = ENGINE.buildSyllableOptions(zhang.syllables, [3], { limit: 20000 });
+  assert(single.length > 0);
+  single.forEach(function (option) {
+    assert.strictEqual(option.selectable, true);
+    assert(option.support[0] > 0);
+  });
+});
+
+test("syllable search: exact pinyin, characters and low-priority matches", function () {
+  const zhang = ENGINE.resolveSurname("张");
+
+  const shang = ENGINE.searchSyllableOptions(zhang.syllables, [1, 2], "shang", 500);
+  assert(shang.length > 0, "shang should match");
+  shang.forEach(function (option) {
+    assert.strictEqual(option.givenSyllables[0].syllable, "shang");
+    assert.strictEqual(option.givenSyllables[0].tone, 1);
+    assert.strictEqual(option.selectable, true);
+    assert(option.samples[0].length > 0);
+  });
+
+  const shan = ENGINE.searchSyllableOptions(zhang.syllables, [3, 2], "shan", 500);
+  assert(shan.length > 0);
+  shan.forEach(function (option) {
+    assert.strictEqual(option.givenSyllables[0].syllable, "shan");
+  });
+
+  const shangChar = ENGINE.searchSyllableOptions(zhang.syllables, [1, 2], "商", 500);
+  assert(shangChar.length > 0);
+  assert(shangChar.every(function (option) { return option.selectable; }));
+  assert(shangChar[0].samples[0].indexOf("商") !== -1);
+
+  const diaoChar = ENGINE.searchSyllableOptions(zhang.syllables, [1, 2], "刁", 500);
+  assert(diaoChar.length > 0);
+  diaoChar.forEach(function (option) {
+    assert.strictEqual(option.selectable, true);
+    assert.strictEqual(option.givenSyllables[0].syllable, "diao");
+    assert(option.support[0] > 0);
+    assert.strictEqual(option.coreSupport[0], 0);
+    assert(option.samples[0].indexOf("刁") !== -1);
+  });
+
+  const qingYu = ENGINE.searchSyllableOptions(zhang.syllables, [1, 4], "qingyu", 20);
+  assert.strictEqual(qingYu.length, 1);
+  assert.strictEqual(qingYu[0].givenPinyin, "qīng yù");
+
+  const spaced = ENGINE.searchSyllableOptions(zhang.syllables, [1, 4], "qing yu", 20);
+  assert.strictEqual(spaced.length, 1);
+  assert.strictEqual(spaced[0].givenPinyin, "qīng yù");
+
+  assert.deepStrictEqual(ENGINE.searchSyllableOptions(zhang.syllables, [1, 2], "", 20), []);
+  assert.deepStrictEqual(ENGINE.searchSyllableOptions(zhang.syllables, [1, 2], "zzz", 20), []);
 });
 
 test("imagery availability covers every category", function () {
@@ -173,8 +287,17 @@ test("imagery availability covers every category", function () {
   const option = findSyllableOption(zhang, [1, 4], "qing", "yu");
   const availability = ENGINE.imageryAvailability(option.givenSyllables);
   assert.strictEqual(availability.length, DATA.imagery.length);
+  const namingPools = option.givenSyllables.map(function (given) {
+    return DATA.namingBySyllableTone[given.syllable + given.tone];
+  });
   availability.forEach(function (item) {
     assert.strictEqual(item.perPosition.length, 2);
+    item.perPosition.forEach(function (count, index) {
+      const expected = namingPools[index].filter(function (entry) {
+        return !entry.lowPriority && entry.tags.indexOf(item.id) !== -1;
+      }).length;
+      assert.strictEqual(count, expected, item.id + " counts only nameable chars");
+    });
     assert(item.characterCount >= 0);
     assert(item.combinations >= 0);
   });
@@ -277,9 +400,9 @@ test("double-character recommendations are coherent", function () {
     assert(ENGINE.BLOCKED_NAMES.indexOf(name.name) === -1);
     name.chars.forEach(function (detail, index) {
       const given = syllableOption.givenSyllables[index];
-      const pool = DATA.bySyllableTone[given.syllable + given.tone];
+      const pool = DATA.namingBySyllableTone[given.syllable + given.tone];
       assert(pool.some(function (entry) { return entry.char === detail.char; }),
-        detail.char + " does not belong to " + given.syllable + given.tone);
+        detail.char + " is not nameable in " + given.syllable + given.tone);
     });
   });
   const names = new Set(result.names.map(function (name) { return name.name; }));
@@ -342,6 +465,62 @@ test("compound surname recommendations work", function () {
   });
 });
 
+test("low-priority characters stay possible but rare", function () {
+  const zhang = ENGINE.resolveSurname("张");
+  const toneOption = ENGINE.buildToneOptions(zhang.syllables, 2)
+    .find(function (option) { return option.givenTones.join("") === "12"; });
+
+  const diao = ENGINE.searchSyllableOptions(zhang.syllables, [1, 2], "diaoling", 20)[0];
+  assert(diao);
+  const diaoNames = ENGINE.recommendNames({
+    surname: zhang,
+    givenSyllables: diao.givenSyllables,
+    toneOption: toneOption,
+    syllableOption: diao,
+    imageryIds: [],
+    count: 4,
+    exclude: {},
+    random: seededRandom(5)
+  });
+  assert(diaoNames.names.length > 0);
+  diaoNames.names.forEach(function (name) {
+    assert(["刁", "叼", "雕"].indexOf(name.chars[0].char) !== -1,
+      name.name + " should use the available low-priority first char");
+  });
+
+  const fei = ENGINE.searchSyllableOptions(zhang.syllables, [1, 2], "feiling", 20)[0];
+  assert(fei);
+  const pools = fei.givenSyllables.map(function (given) {
+    return DATA.namingBySyllableTone[given.syllable + given.tone];
+  });
+  const rng = seededRandom(20261025);
+  let lowCount = 0;
+  let totalCount = 0;
+  for (let i = 0; i < 60; i += 1) {
+    const result = ENGINE.recommendNames({
+      surname: zhang,
+      givenSyllables: fei.givenSyllables,
+      toneOption: toneOption,
+      syllableOption: fei,
+      imageryIds: [],
+      count: 6,
+      exclude: {},
+      random: rng
+    });
+    result.names.forEach(function (name) {
+      name.chars.forEach(function (detail, index) {
+        const entry = pools[index].find(function (row) { return row.char === detail.char; });
+        totalCount += 1;
+        if (entry && entry.lowPriority) lowCount += 1;
+      });
+    });
+  }
+  assert(totalCount > 0);
+  assert(lowCount > 0, "low-priority chars should appear occasionally");
+  assert(lowCount / totalCount < 0.05,
+    "low-priority chars should stay rare, got " + (lowCount / totalCount).toFixed(3));
+});
+
 test("fifty randomized recommendation scenarios do not crash", function () {
   const surnames = ["张", "李", "王", "陈", "欧阳", "司马"];
   const imagery = DATA.imagery.map(function (item) { return item.id; });
@@ -365,6 +544,16 @@ test("fifty randomized recommendation scenarios do not crash", function () {
       random: rng
     });
     assert(result.names.length > 0, "no names for " + surname.text + " " + option.givenPinyin);
+    option.givenSyllables.forEach(function (given, index) {
+      const pool = DATA.namingBySyllableTone[given.syllable + given.tone];
+      assert(pool && pool.length, "no nameable pool for " + given.syllable + given.tone);
+      result.names.forEach(function (name) {
+        if (index >= name.chars.length) return;
+        const char = name.chars[index].char;
+        assert(pool.some(function (entry) { return entry.char === char; }),
+          char + " is not nameable");
+      });
+    });
     result.names.forEach(function (name) {
       assert.strictEqual(Array.from(name.name).length,
         surname.syllables.length + length, name.name);

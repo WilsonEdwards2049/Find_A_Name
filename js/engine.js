@@ -23,6 +23,9 @@
     "秦寿", "夏建仁", "沈京兵", "魏生津", "赖月京", "付炎杰"
   ];
 
+  const LOW_PRIORITY_FACTOR = 0.02;
+  const LOW_PRIORITY_BATCH_CHANCE = 0.15;
+
   function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
   }
@@ -307,13 +310,14 @@
     });
   }
 
-  function getSyllablePools(givenSyllables) {
+  function getSyllablePools(givenSyllables, useFullPools) {
+    const source = useFullPools ? DATA.bySyllableTone : DATA.namingBySyllableTone;
     return givenSyllables.map(function (item) {
-      return DATA.bySyllableTone[item.syllable + item.tone] || [];
+      return source[item.syllable + item.tone] || [];
     });
   }
 
-  function makeSyllableOption(surnameSyllables, givenSyllables, pools) {
+  function makeSyllableOption(surnameSyllables, givenSyllables, pools, fullPools) {
     const fullSyllables = surnameSyllables.concat(givenSyllables);
     const n = fullSyllables.length;
     const syllables = fullSyllables.map(function (item) { return item.syllable; });
@@ -389,7 +393,10 @@
     }
 
     const support = pools.map(function (pool) { return pool.length; });
-    const minSupport = Math.min.apply(null, support);
+    const coreSupport = pools.map(function (pool) {
+      return pool.filter(function (entry) { return !entry.lowPriority; }).length;
+    });
+    const minSupport = Math.min.apply(null, coreSupport);
     if (minSupport <= 1) {
       score -= 6;
       reasons.push({ type: "minus", text: "可用字较少" });
@@ -410,10 +417,18 @@
 
     const fullPinyin = displaySyllables(fullSyllables);
     const givenPinyin = displaySyllables(givenSyllables);
-    const samples = pools.map(function (pool) {
+    const samplePools = pools.map(function (pool, index) {
+      if (!pool.length) return (fullPools && fullPools[index]) || [];
+      const normal = pool.filter(function (entry) { return !entry.lowPriority; });
+      return normal.length ? normal : pool;
+    });
+    const searchPools = fullPools || pools;
+    const fullSupport = searchPools.map(function (pool) { return pool.length; });
+    const selectable = pools.every(function (pool) { return pool.length > 0; });
+    const samples = samplePools.map(function (pool) {
       return pool.slice(0, 4).map(function (entry) { return entry.char; });
     });
-    const allSampleChars = pools.map(function (pool) {
+    const allSampleChars = searchPools.map(function (pool) {
       return pool.map(function (entry) { return entry.char; }).join("");
     }).join(" ");
     const searchText = (
@@ -431,10 +446,13 @@
       label: label,
       reasons: reasons,
       support: support,
+      coreSupport: coreSupport,
+      fullSupport: fullSupport,
       samples: samples,
       initials: initials,
       finals: finals,
-      searchText: searchText
+      searchText: searchText,
+      selectable: selectable
     };
   }
 
@@ -442,7 +460,7 @@
     const settings = options || {};
     const limit = settings.limit || 1500;
     const sourcePools = givenTones.map(function (tone, index) {
-      return DATA.syllablesByTone[tone].map(function (syllable) {
+      return (DATA.namingSyllablesByTone[tone] || []).map(function (syllable) {
         return { syllable: syllable, tone: tone, position: index };
       });
     });
@@ -450,18 +468,26 @@
 
     if (givenTones.length === 1) {
       sourcePools[0].forEach(function (first) {
-        const candidatePools = [DATA.bySyllableTone[first.syllable + first.tone] || []];
-        if (!candidatePools[0].length) return;
-        results.push(makeSyllableOption(surnameSyllables, [first], candidatePools));
+        const namingPool = DATA.namingBySyllableTone[first.syllable + first.tone] || [];
+        if (!namingPool.length) return;
+        const fullPool = DATA.bySyllableTone[first.syllable + first.tone] || [];
+        results.push(makeSyllableOption(surnameSyllables, [first], [namingPool], [fullPool]));
       });
     } else {
       sourcePools[0].forEach(function (first) {
-        const firstPool = DATA.bySyllableTone[first.syllable + first.tone] || [];
+        const firstPool = DATA.namingBySyllableTone[first.syllable + first.tone] || [];
         if (!firstPool.length) return;
+        const firstFull = DATA.bySyllableTone[first.syllable + first.tone] || [];
         sourcePools[1].forEach(function (second) {
-          const secondPool = DATA.bySyllableTone[second.syllable + second.tone] || [];
+          const secondPool = DATA.namingBySyllableTone[second.syllable + second.tone] || [];
           if (!secondPool.length) return;
-          results.push(makeSyllableOption(surnameSyllables, [first, second], [firstPool, secondPool]));
+          const secondFull = DATA.bySyllableTone[second.syllable + second.tone] || [];
+          results.push(makeSyllableOption(
+            surnameSyllables,
+            [first, second],
+            [firstPool, secondPool],
+            [firstFull, secondFull]
+          ));
         });
       });
     }
@@ -474,12 +500,168 @@
     return results.slice(0, limit);
   }
 
+  const ALL_SYLLABLE_KEYS = Object.keys(DATA.bySyllableTone);
+  const KNOWN_SYLLABLES = {};
+  ALL_SYLLABLE_KEYS.forEach(function (key) {
+    KNOWN_SYLLABLES[DATA.bySyllableTone[key][0].syllable] = true;
+  });
+
+  function normalizePinyinToken(token) {
+    const match = /^([a-zv]+)([1-4])?$/.exec(token);
+    if (!match) return null;
+    return { syllable: match[1], tone: match[2] ? Number(match[2]) : 0 };
+  }
+
+  function syllablesForChar(char, tone) {
+    const found = [];
+    ALL_SYLLABLE_KEYS.forEach(function (key) {
+      const pool = DATA.bySyllableTone[key];
+      const hit = pool.some(function (entry) {
+        return entry.char === char && entry.tone === tone;
+      });
+      if (hit) found.push(pool[0].syllable);
+    });
+    return found;
+  }
+
+  function splitPinyinPair(token) {
+    const pairs = [];
+    for (let index = 1; index < token.length; index += 1) {
+      const first = token.slice(0, index);
+      const second = token.slice(index);
+      if (KNOWN_SYLLABLES[first] && KNOWN_SYLLABLES[second]) {
+        pairs.push([first, second]);
+      }
+    }
+    return pairs;
+  }
+
+  function searchSyllableOptions(surnameSyllables, givenTones, query, limit) {
+    const raw = String(query || "").trim().toLowerCase();
+    if (!raw) return [];
+    const tokens = raw.replace(/ü/g, "v").split(/\s+/).filter(Boolean);
+    const patterns = [];
+    const isChinese = /[\u3400-\u9fff]/.test(tokens.join(""));
+    const chars = isChinese ? Array.from(tokens.join("")) : [];
+
+    if (isChinese) {
+      if (givenTones.length === 1) {
+        if (chars.length !== 1) return [];
+        patterns.push([syllablesForChar(chars[0], givenTones[0])]);
+      } else if (chars.length === 1) {
+        syllablesForChar(chars[0], givenTones[0]).forEach(function (syllable) {
+          patterns.push([[syllable], null]);
+        });
+        syllablesForChar(chars[0], givenTones[1]).forEach(function (syllable) {
+          patterns.push([null, [syllable]]);
+        });
+      } else if (chars.length === 2) {
+        const firsts = syllablesForChar(chars[0], givenTones[0]);
+        const seconds = syllablesForChar(chars[1], givenTones[1]);
+        if (firsts.length && seconds.length) patterns.push([firsts, seconds]);
+      } else {
+        return [];
+      }
+    } else if (tokens.length === 1) {
+      const token = tokens[0];
+      if (!/^[a-zv]+[1-4]?$/.test(token)) return [];
+      if (givenTones.length === 1) {
+        const parsed = normalizePinyinToken(token);
+        if (parsed && parsed.syllable in KNOWN_SYLLABLES &&
+          (!parsed.tone || parsed.tone === givenTones[0])) {
+          patterns.push([[parsed.syllable]]);
+        }
+      } else {
+        const parsed = normalizePinyinToken(token);
+        if (parsed && parsed.syllable in KNOWN_SYLLABLES) {
+          if (!parsed.tone || parsed.tone === givenTones[0]) {
+            patterns.push([[parsed.syllable], null]);
+          }
+          if (!parsed.tone || parsed.tone === givenTones[1]) {
+            patterns.push([null, [parsed.syllable]]);
+          }
+        }
+        splitPinyinPair(token.replace(/[1-4]$/, "")).forEach(function (pair) {
+          patterns.push([[pair[0]], [pair[1]]]);
+        });
+      }
+    } else if (tokens.length === 2) {
+      if (givenTones.length !== 2) return [];
+      const first = normalizePinyinToken(tokens[0]);
+      const second = normalizePinyinToken(tokens[1]);
+      if (!first || !second) return [];
+      if (!(first.syllable in KNOWN_SYLLABLES) || !(second.syllable in KNOWN_SYLLABLES)) {
+        return [];
+      }
+      if (first.tone && first.tone !== givenTones[0]) return [];
+      if (second.tone && second.tone !== givenTones[1]) return [];
+      patterns.push([[first.syllable], [second.syllable]]);
+    } else {
+      return [];
+    }
+
+    const fillers = givenTones.map(function (tone) {
+      return DATA.namingSyllablesByTone[tone] || [];
+    });
+    const seen = {};
+    const results = [];
+
+    patterns.forEach(function (pattern) {
+      const firsts = pattern[0] || fillers[0];
+      const seconds = givenTones.length > 1 ? pattern[1] || fillers[1] : [];
+      const combos = givenTones.length > 1 ? [firsts, seconds] : [firsts];
+      const firstList = combos[0];
+      const secondList = combos[1] || [null];
+      firstList.forEach(function (firstSyllable) {
+        secondList.forEach(function (secondSyllable) {
+          const given = [firstSyllable, secondSyllable]
+            .slice(0, givenTones.length)
+            .map(function (syllable, index) {
+              return { syllable: syllable, tone: givenTones[index], position: index };
+            });
+          const key = given.map(function (item) { return item.syllable + item.tone; }).join("|");
+          if (seen[key]) return;
+          seen[key] = true;
+          const namingPools = given.map(function (item) {
+            return DATA.namingBySyllableTone[item.syllable + item.tone] || [];
+          });
+          const fullPools = given.map(function (item) {
+            return DATA.bySyllableTone[item.syllable + item.tone] || [];
+          });
+          if (fullPools.some(function (pool) { return !pool.length; })) return;
+          const option = makeSyllableOption(surnameSyllables, given, namingPools, fullPools);
+          if (isChinese) {
+            chars.forEach(function (char) {
+              given.forEach(function (item, index) {
+                const pool = fullPools[index] || [];
+                if (!pool.some(function (entry) { return entry.char === char; })) return;
+                option.samples[index] = [char].concat(
+                  option.samples[index].filter(function (sample) { return sample !== char; })
+                ).slice(0, 4);
+              });
+            });
+          }
+          results.push(option);
+        });
+      });
+    });
+
+    results.sort(function (a, b) {
+      if (a.selectable !== b.selectable) return a.selectable ? -1 : 1;
+      if (b.score !== a.score) return b.score - a.score;
+      const aSupport = a.support.reduce(function (sum, n) { return sum + n; }, 0);
+      const bSupport = b.support.reduce(function (sum, n) { return sum + n; }, 0);
+      return bSupport - aSupport;
+    });
+    return results.slice(0, limit || 300);
+  }
+
   function imageryAvailability(givenSyllables) {
     const pools = getSyllablePools(givenSyllables);
     return DATA.imagery.map(function (image) {
       const perPosition = pools.map(function (pool) {
         return pool.filter(function (entry) {
-          return entry.tags.indexOf(image.id) !== -1;
+          return !entry.lowPriority && entry.tags.indexOf(image.id) !== -1;
         }).length;
       });
       const combinations = perPosition.reduce(function (product, count) {
@@ -594,6 +776,34 @@
     return picked;
   }
 
+  function pickNames(candidates, count, rng) {
+    const normal = candidates.filter(function (item) { return !item.lowPriority; });
+    const low = candidates.filter(function (item) { return item.lowPriority; });
+    if (!low.length) return weightedSample(candidates, count, rng);
+    if (!normal.length) return weightedSample(low, count, rng);
+
+    const allowLow = normal.length >= count && rng() < LOW_PRIORITY_BATCH_CHANCE;
+    const normalCount = allowLow ? Math.max(count - 1, 0) : Math.min(count, normal.length);
+    const picked = weightedSample(normal, normalCount, rng);
+
+    if (allowLow && picked.length < count) {
+      weightedSample(low, 1, rng).forEach(function (item) {
+        picked.push(item);
+      });
+    }
+    if (picked.length < count) {
+      weightedSample(low, count - picked.length, rng).forEach(function (item) {
+        if (picked.indexOf(item) === -1) picked.push(item);
+      });
+    }
+    if (picked.length < count) {
+      weightedSample(normal, count - picked.length, rng).forEach(function (item) {
+        if (picked.indexOf(item) === -1) picked.push(item);
+      });
+    }
+    return picked.slice(0, count);
+  }
+
   function recommendNames(params) {
     const surname = params.surname;
     const givenSyllables = params.givenSyllables;
@@ -610,7 +820,7 @@
 
     const filteredPools = pools.map(function (pool) {
       return pool.filter(function (entry) {
-        return countMatches(entry.tags, selectedImagery) > 0;
+        return !entry.lowPriority && countMatches(entry.tags, selectedImagery) > 0;
       });
     });
     const isSingle = givenSyllables.length === 1;
@@ -650,6 +860,8 @@
         weight *= 1 + matchWeight * 0.22;
       }
       if (strict) weight *= 1.1;
+      const lowCount = chars.filter(function (entry) { return entry.lowPriority; }).length;
+      if (lowCount) weight *= Math.pow(LOW_PRIORITY_FACTOR, lowCount);
       return {
         name: name,
         chars: chars,
@@ -662,6 +874,7 @@
           return item.tone;
         }).join(" · "),
         allTags: scores.unionTags,
+        lowPriority: chars.some(function (entry) { return entry.lowPriority; }),
         weight: Math.max(weight, 0.001)
       };
     }).filter(Boolean);
@@ -690,7 +903,7 @@
       };
     }
 
-    const picked = weightedSample(available, count, rng);
+    const picked = pickNames(available, count, rng);
     const names = picked.map(function (item) {
       const tags = item.allTags.slice(0, 4);
       const selectedHits = item.score.selectedHits;
@@ -762,10 +975,12 @@
     resolveSurname: resolveSurname,
     buildToneOptions: buildToneOptions,
     buildSyllableOptions: buildSyllableOptions,
+    searchSyllableOptions: searchSyllableOptions,
     imageryAvailability: imageryAvailability,
     getNamingExamples: getNamingExamples,
     getSurnameExamples: getSurnameExamples,
     recommendNames: recommendNames,
-    BLOCKED_NAMES: BLOCKED_NAMES
+    BLOCKED_NAMES: BLOCKED_NAMES,
+    LOW_PRIORITY_FACTOR: LOW_PRIORITY_FACTOR
   };
 })();

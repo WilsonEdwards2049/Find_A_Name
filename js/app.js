@@ -24,6 +24,8 @@
       toneOption: null,
       syllableCacheKey: "",
       syllableOptions: [],
+      syllableSearchResults: [],
+      syllableSearchCache: {},
       syllableOption: null,
       syllableQuery: "",
       syllablePage: 0,
@@ -164,6 +166,8 @@
   function resetAfterToneSelection() {
     state.syllableCacheKey = "";
     state.syllableOptions = [];
+    state.syllableSearchCache = {};
+    state.syllableSearchResults = [];
     state.syllableOption = null;
     state.syllableQuery = "";
     state.syllablePage = 0;
@@ -265,6 +269,8 @@
       state.toneOptions = [];
       state.syllableCacheKey = "";
       state.syllableOptions = [];
+      state.syllableSearchCache = {};
+      state.syllableSearchResults = [];
       state.syllableOption = null;
       state.syllableQuery = "";
       state.syllablePage = 0;
@@ -345,29 +351,34 @@
       state.toneOption.givenTones,
       { limit: 20000 }
     );
+    state.syllableSearchCache = {};
+    state.syllableSearchResults = [];
     state.syllablePage = 0;
     state.syllableQuery = "";
     state.syllableOption = null;
     els.syllableSearch.value = "";
   }
 
-  function matchesSyllableQuery(option, query) {
-    // 拼音按音节精确匹配；汉字仍按包含关系搜索。
-    if (/^[a-z]+$/.test(query)) {
-      const syllables = option.givenSyllables.map(function (item) {
-        return item.syllable;
-      });
-      return syllables.indexOf(query) !== -1 || syllables.join("") === query;
-    }
-    return normalizeQuery(option.searchText).indexOf(query) !== -1;
-  }
-
   function filteredSyllables() {
-    const query = normalizeQuery(state.syllableQuery);
-    if (!query) return state.syllableOptions;
-    return state.syllableOptions.filter(function (option) {
-      return matchesSyllableQuery(option, query);
-    });
+    const query = String(state.syllableQuery || "").trim();
+    if (!query) {
+      state.syllableSearchResults = [];
+      return state.syllableOptions;
+    }
+    const cacheKey = state.syllableCacheKey + "|" + query;
+    if (state.syllableSearchCache[cacheKey]) {
+      state.syllableSearchResults = state.syllableSearchCache[cacheKey];
+      return state.syllableSearchResults;
+    }
+    const results = ENGINE.searchSyllableOptions(
+      state.surname.syllables,
+      state.toneOption.givenTones,
+      query,
+      1000
+    );
+    state.syllableSearchCache[cacheKey] = results;
+    state.syllableSearchResults = results;
+    return results;
   }
 
   function updateChosenTone() {
@@ -458,6 +469,7 @@
     els.syllableGrid.innerHTML = visible.map(function (option, index) {
       const key = syllableKey(option);
       const selected = key === selectedKey;
+      const selectable = option.selectable !== false;
       const samples = option.samples.map(function (chars) {
         return chars.join(" · ");
       }).join(' <span>/</span> ');
@@ -465,17 +477,26 @@
         return '<span class="reason-chip' + (reason.type === "minus" ? " is-minus" : "") +
           '">' + esc(reason.text) + "</span>";
       }).join("");
+      const supportLine = selectable
+        ? "可用字<br>" + option.support.join(" + ")
+        : "字典字<br>" + option.fullSupport.join(" + ");
+      const dictBadge = selectable
+        ? ""
+        : '<span class="syllable-dict">仅字典收录 · 不适名</span>';
       return '<button class="syllable-card' + (selected ? " is-selected" : "") +
-        '" type="button" data-key="' + esc(key) + '" aria-pressed="' + String(selected) +
-        '">' +
+        (selectable ? "" : " is-dictionary") +
+        '" type="button" data-key="' + esc(key) + '" aria-pressed="' +
+        String(selected) + '"' + (selectable ? "" : ' aria-disabled="true"') + '>' +
+        dictBadge +
         '<span class="syllable-main">' +
         '<span class="syllable-rank">NO. ' + pad(start + index + 1) + "</span>" +
         '<span class="syllable-pinyin">' + esc(option.givenPinyin) + "</span>" +
         '<span class="syllable-samples">' + samples + "</span>" +
         '<span class="syllable-reasons">' + reasons + "</span></span>" +
-        '<span class="syllable-score"><strong>' + option.score + '</strong>' +
-        '<span>' + esc(option.label) + '</span>' +
-        '<span class="syllable-support">可用字<br>' + option.support.join(" + ") + "</span></span>" +
+        '<span class="syllable-score"><strong>' +
+        (selectable ? option.score : "—") + '</strong>' +
+        '<span>' + esc(selectable ? option.label : "字典") + '</span>' +
+        '<span class="syllable-support">' + supportLine + "</span></span>" +
         "</button>";
     }).join("");
 
@@ -998,6 +1019,8 @@
       state.toneOption = null;
       state.syllableCacheKey = "";
       state.syllableOptions = [];
+      state.syllableSearchCache = {};
+      state.syllableSearchResults = [];
       state.syllableOption = null;
       state.syllableQuery = "";
       state.syllablePage = 0;
@@ -1059,10 +1082,15 @@
     els.syllableGrid.addEventListener("click", function (event) {
       const card = event.target.closest("[data-key]");
       if (!card) return;
-      const option = state.syllableOptions.find(function (item) {
+      const options = filteredSyllables();
+      const option = options.find(function (item) {
         return syllableKey(item) === card.dataset.key;
       });
       if (!option) return;
+      if (option.selectable === false) {
+        showToast("该音节仅字典收录，暂不适合自动取名。");
+        return;
+      }
       const changed = !state.syllableOption || syllableKey(state.syllableOption) !== card.dataset.key;
       state.syllableOption = option;
       if (changed) resetAfterSyllableSelection();
