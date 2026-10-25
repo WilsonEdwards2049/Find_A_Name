@@ -419,6 +419,24 @@ test("full-name tone examples cover every surname tone pattern", function () {
   });
 });
 
+test("张 has three same-surname examples for every full-name tone pattern", function () {
+  const zhang = ENGINE.resolveSurname("张");
+  for (let first = 1; first <= 4; first++) {
+    const single = ENGINE.getSurnameExamples(zhang, [first], 1, 10);
+    assert(single.length >= 3, "1|" + first);
+    single.forEach(function (example) {
+      assert.strictEqual(example.surname, "张");
+    });
+    for (let second = 1; second <= 4; second++) {
+      const list = ENGINE.getSurnameExamples(zhang, [first, second], 2, 10);
+      assert(list.length >= 3, "1|" + first + "-" + second);
+      list.forEach(function (example) {
+        assert.strictEqual(example.surname, "张");
+      });
+    }
+  }
+});
+
 test("double-character recommendations are coherent", function () {
   const zhang = ENGINE.resolveSurname("张");
   const toneOption = ENGINE.buildToneOptions(zhang.syllables, 2)

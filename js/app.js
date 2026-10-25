@@ -402,52 +402,49 @@
         state.nameLength,
         3
       );
-      if (own.length >= 3) return { own: own, examples: own.slice(0, 3) };
-      const used = {};
-      own.forEach(function (example) { used[example.fullName] = true; });
-      const extras = ENGINE.getToneMatchedExamples(
-        state.surname,
-        option.givenTones,
-        state.nameLength,
-        20
-      ).filter(function (example) {
-        return example.surname !== state.surname.text &&
-          !used[example.fullName];
-      });
-      return { own: own, examples: own.concat(extras).slice(0, 3) };
+      if (own.length) return { examples: own, fallback: false };
+      return {
+        examples: ENGINE.getToneMatchedExamples(
+          state.surname,
+          option.givenTones,
+          state.nameLength,
+          3
+        ),
+        fallback: true
+      };
     };
     let toneOption = state.toneOption || null;
-    let collected = { own: [], examples: [] };
+    let collected = { examples: [], fallback: false };
     if (toneOption) {
       collected = collect(toneOption);
     } else {
-      // 未选声调时优先预览确有名例的声调，避免默认落在无同姓名例的组合上。
+      // 未选声调时优先预览确有同姓名例的声调，避免默认落在没有同姓名例的组合上。
       toneOption = state.toneOptions.find(function (option) {
-        return collect(option).own.length > 0;
+        return ENGINE.getSurnameExamples(
+          state.surname,
+          option.givenTones,
+          state.nameLength,
+          1
+        ).length > 0;
       }) || state.toneOptions[0];
       collected = collect(toneOption);
     }
     const examples = collected.examples;
-    const ownCount = collected.own.length;
+    const fallback = collected.fallback;
     const surnameText = state.surname.text;
     const fullToneNames = state.surname.tones
       .concat(toneOption.givenTones)
       .map(ENGINE.toneName)
       .join(" · ");
-    const ownNames = {};
-    collected.own.forEach(function (example) { ownNames[example.fullName] = true; });
     let subtitleText = "全名声调 " + fullToneNames;
-    if (ownCount) {
-      subtitleText = "与「" + surnameText + "」同姓 " + ownCount + " 例 · " + subtitleText;
-      if (examples.length > ownCount) {
-        subtitleText += " · 另补同调原名（不改姓）" + (examples.length - ownCount) + " 例";
-      }
-    } else {
-      subtitleText = "暂无与「" + surnameText + "」同姓的名例 · 以下为同调原名（不改姓） · " +
-        subtitleText;
+    if (!fallback) {
+      subtitleText = "与「" + surnameText + "」同姓 " + examples.length + " 例 · " + subtitleText;
+    } else if (examples.length) {
+      subtitleText = "暂无与「" + surnameText +
+        "」同姓的名例 · 以下为同调原名（不改姓） · " + subtitleText;
     }
     subtitle.textContent = (state.toneOption ? "" :
-      (ownCount ? "默认展示有名例的声调 · " : "默认展示最高分声调 · ")) + subtitleText;
+      (fallback ? "默认展示最高分声调 · " : "默认展示有名例的声调 · ")) + subtitleText;
     if (!examples.length) {
       strip.innerHTML = '<p class="examples-empty">暂无与「' + esc(surnameText) +
         "」同姓、且名内声调为 " + esc(toneOption.givenTones.join(" · ")) +
@@ -460,8 +457,8 @@
         '<div class="example-top"><span class="example-name">' +
         esc(example.fullName) +
         '</span><span class="example-type" title="' +
-        esc(ownNames[example.fullName] ? "与输入姓氏同名" : "全名声调相同、保留原姓") +
-        '">' + esc((ownNames[example.fullName] ? "同姓" : "同调") + " · " + example.type) +
+        esc(fallback ? "全名声调相同、保留原姓" : "与输入姓氏同名") +
+        '">' + esc((fallback ? "同调" : "同姓") + " · " + example.type) +
         "</span></div>" +
         '<div class="example-pinyin">' + esc(example.fullPinyinDisplay) + "</div>" +
         '<div class="example-origin">名例 · ' + esc(example.origin) + "</div>" +
