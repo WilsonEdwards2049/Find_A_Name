@@ -1373,6 +1373,19 @@ button:disabled {
   letter-spacing: 0.08em;
 }
 
+.example-surname {
+  color: var(--ink-soft);
+  font-weight: 400;
+}
+
+.example-join {
+  margin: 0 2px;
+  color: var(--faint);
+  font-size: 11px;
+  letter-spacing: 0;
+  vertical-align: 2px;
+}
+
 .example-type {
   display: grid;
   place-items: center;

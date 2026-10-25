@@ -367,7 +367,7 @@
   }
 
   function renderNamingExamples() {
-    if (!state.toneOption) {
+    if (!state.toneOption || !state.surname) {
       els.examplesPanel.hidden = true;
       return;
     }
@@ -380,18 +380,24 @@
       els.examplesPanel.hidden = true;
       return;
     }
-    const toneNames = state.toneOption.givenTones.map(ENGINE.toneName).join(" · ");
+    const surnameText = state.surname.text;
+    const fullToneNames = state.surname.tones
+      .concat(state.toneOption.givenTones)
+      .map(ENGINE.toneName)
+      .join(" · ");
     const typeLabels = { 史: "历史人物", 文: "文学形象", 诗: "诗文意象" };
-    els.examplesSubtitle.textContent = "与所选" +
-      (state.nameLength === 1 ? "单字名" : "双字名") +
-      "声调同型 · " + toneNames;
+    els.examplesSubtitle.textContent = "与「" + surnameText + "」连读 · 全名声调 " +
+      fullToneNames;
     els.examplesStrip.innerHTML = examples.map(function (example) {
       return '<article class="example-card">' +
-        '<div class="example-top"><span class="example-name">' + esc(example.given) +
+        '<div class="example-top"><span class="example-name">' +
+        '<span class="example-surname">' + esc(surnameText) + "</span>" +
+        '<span class="example-join"> + </span>' + esc(example.given) +
         '</span><span class="example-type" title="' + esc(typeLabels[example.type] || "名例") +
         '">' + esc(example.type) + "</span></div>" +
-        '<div class="example-pinyin">' + esc(example.pinyinDisplay) + "</div>" +
-        '<div class="example-origin">' + esc(example.origin) + "</div>" +
+        '<div class="example-pinyin">' + esc(state.surname.pinyin + " " + example.pinyinDisplay) +
+        "</div>" +
+        '<div class="example-origin">名例 · ' + esc(example.origin) + "</div>" +
         '<p class="example-note">' + esc(example.note) + "</p>" +
         "</article>";
     }).join("");
