@@ -1382,17 +1382,14 @@ button:disabled {
   letter-spacing: 0.08em;
 }
 
-.example-surname {
-  color: var(--ink-soft);
-  font-weight: 400;
-}
-
-.example-join {
-  margin: 0 2px;
-  color: var(--faint);
+.examples-empty {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 14px 12px;
+  border: 1px dashed rgba(25, 35, 30, 0.16);
+  color: var(--muted);
   font-size: 11px;
-  letter-spacing: 0;
-  vertical-align: 2px;
+  line-height: 1.75;
 }
 
 .example-type {
@@ -2924,6 +2921,11 @@ button:disabled {
 
   .example-name {
     font-size: 20px;
+  }
+
+  .examples-empty {
+    grid-column: auto;
+    width: 100%;
   }
 
   .examples-foot {

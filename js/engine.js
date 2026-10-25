@@ -92,6 +92,13 @@
 
   const NAMING_EXAMPLES = (DATA.namingExamples || []).map(function (example) {
     const syllables = example.pinyin.split(/\s+/).map(parseTonePinyin);
+    const surnameChars = Array.from(example.surname || "");
+    const surnameSyllables = (example.surnamePinyin || "").split(/\s+/)
+      .filter(Boolean)
+      .map(parseTonePinyin);
+    const hasSurname = surnameChars.length > 0 &&
+      surnameSyllables.length === surnameChars.length &&
+      surnameSyllables.every(Boolean);
     return {
       given: example.given,
       length: Array.from(example.given).length,
@@ -100,7 +107,14 @@
       pinyinDisplay: displaySyllables(syllables.filter(Boolean)),
       origin: example.origin,
       type: example.type,
-      note: example.note
+      note: example.note,
+      surname: hasSurname ? example.surname : "",
+      surnameSyllables: hasSurname ? surnameSyllables : [],
+      surnameTones: hasSurname ? surnameSyllables.map(function (item) { return item.tone; }) : [],
+      fullName: hasSurname ? example.surname + example.given : "",
+      fullPinyinDisplay: hasSurname
+        ? displaySyllables(surnameSyllables.concat(syllables.filter(Boolean)))
+        : ""
     };
   }).filter(function (example) {
     return example.syllables.every(Boolean) && example.length === example.syllables.length;
@@ -110,6 +124,17 @@
     const target = givenTones.join("-");
     return NAMING_EXAMPLES.filter(function (example) {
       return example.length === nameLength && example.tones.join("-") === target;
+    }).slice(0, limit || 3);
+  }
+
+  function getSurnameExamples(surname, givenTones, nameLength, limit) {
+    if (!surname || !surname.text) return [];
+    const target = givenTones.join("-");
+    return NAMING_EXAMPLES.filter(function (example) {
+      return example.surname === surname.text &&
+        example.surnameTones.join("-") === surname.tones.join("-") &&
+        example.length === nameLength &&
+        example.tones.join("-") === target;
     }).slice(0, limit || 3);
   }
 
@@ -739,6 +764,7 @@
     buildSyllableOptions: buildSyllableOptions,
     imageryAvailability: imageryAvailability,
     getNamingExamples: getNamingExamples,
+    getSurnameExamples: getSurnameExamples,
     recommendNames: recommendNames,
     BLOCKED_NAMES: BLOCKED_NAMES
   };

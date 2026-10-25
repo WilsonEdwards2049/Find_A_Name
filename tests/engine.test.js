@@ -192,6 +192,15 @@ test("naming examples cover every tone pattern", function () {
     assert(validTypes.has(example.type), example.given + " type");
     assert(example.origin, example.given + " origin");
     assert(example.note, example.given + " note");
+    assert.strictEqual(!!example.surname, !!example.surnamePinyin,
+      example.given + " surname fields must pair");
+    if (example.surname) {
+      const expected = DATA.surnames[example.surname] ||
+        DATA.compoundSurnames[example.surname];
+      assert(expected, example.surname + " is not a known surname");
+      assert.deepStrictEqual(expected.slice(), example.surnamePinyin.split(/\s+/),
+        example.surname + " pinyin must match surname data");
+    }
   });
 
   for (let tone = 1; tone <= 4; tone += 1) {
@@ -214,6 +223,31 @@ test("naming examples cover every tone pattern", function () {
       });
     }
   }
+});
+
+test("surname examples require the exact same surname", function () {
+  const xue = ENGINE.resolveSurname("薛");
+  const baoChai = ENGINE.getSurnameExamples(xue, [3, 1], 2, 3);
+  assert.strictEqual(baoChai.length, 1);
+  assert.strictEqual(baoChai[0].fullName, "薛宝钗");
+  assert.strictEqual(baoChai[0].fullPinyinDisplay, "xuē bǎo chāi");
+
+  const wang = ENGINE.resolveSurname("王");
+  assert.deepStrictEqual(ENGINE.getSurnameExamples(wang, [3, 1], 2, 3), []);
+
+  const zhang = ENGINE.resolveSurname("张");
+  const ziFang = ENGINE.getSurnameExamples(zhang, [3, 2], 2, 3);
+  assert.strictEqual(ziFang.length, 1);
+  assert.strictEqual(ziFang[0].fullName, "张子房");
+  assert.strictEqual(ziFang[0].fullPinyinDisplay, "zhāng zǐ fáng");
+
+  const sima = ENGINE.resolveSurname("司马");
+  const xiangRu = ENGINE.getSurnameExamples(sima, [4, 2], 2, 3);
+  assert.strictEqual(xiangRu.length, 1);
+  assert.strictEqual(xiangRu[0].fullName, "司马相如");
+  assert.strictEqual(xiangRu[0].fullPinyinDisplay, "sī mǎ xiàng rú");
+
+  assert.deepStrictEqual(ENGINE.getSurnameExamples(null, [3, 1], 2, 3), []);
 });
 
 test("double-character recommendations are coherent", function () {

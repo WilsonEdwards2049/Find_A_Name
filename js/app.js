@@ -380,19 +380,28 @@
   }
 
   function renderExamplesInto(panel, subtitle, strip) {
-    const toneOption = state.toneOption || state.toneOptions[0] || null;
-    if (!toneOption || !state.surname) {
+    if (!state.surname || !state.toneOptions.length) {
       panel.hidden = true;
       return;
     }
-    const examples = ENGINE.getNamingExamples(
-      toneOption.givenTones,
-      state.nameLength,
-      3
-    );
-    if (!examples.length) {
-      panel.hidden = true;
-      return;
+    const collect = function (option) {
+      return ENGINE.getSurnameExamples(
+        state.surname,
+        option.givenTones,
+        state.nameLength,
+        3
+      );
+    };
+    let toneOption = state.toneOption || null;
+    let examples = [];
+    if (toneOption) {
+      examples = collect(toneOption);
+    } else {
+      // 未选声调时优先预览确有名例的声调，避免默认落在无同姓名例的组合上。
+      toneOption = state.toneOptions.find(function (option) {
+        return collect(option).length > 0;
+      }) || state.toneOptions[0];
+      examples = collect(toneOption);
     }
     const surnameText = state.surname.text;
     const fullToneNames = state.surname.tones
@@ -400,17 +409,22 @@
       .map(ENGINE.toneName)
       .join(" · ");
     const typeLabels = { 史: "历史人物", 文: "文学形象", 诗: "诗文意象" };
-    subtitle.textContent = (state.toneOption ? "" : "默认展示最高分声调 · ") +
-      "与「" + surnameText + "」连读 · 全名声调 " + fullToneNames;
+    subtitle.textContent = (state.toneOption ? "" : "默认展示有名例的声调 · ") +
+      "与「" + surnameText + "」同姓 · 全名声调 " + fullToneNames;
+    if (!examples.length) {
+      strip.innerHTML = '<p class="examples-empty">暂无与「' + esc(surnameText) +
+        "」同姓、且名内声调为 " + esc(toneOption.givenTones.join(" · ")) +
+        " 的名例。换个声调或姓氏再看看。</p>";
+      panel.hidden = false;
+      return;
+    }
     strip.innerHTML = examples.map(function (example) {
       return '<article class="example-card">' +
         '<div class="example-top"><span class="example-name">' +
-        '<span class="example-surname">' + esc(surnameText) + "</span>" +
-        '<span class="example-join"> + </span>' + esc(example.given) +
+        esc(example.fullName) +
         '</span><span class="example-type" title="' + esc(typeLabels[example.type] || "名例") +
         '">' + esc(example.type) + "</span></div>" +
-        '<div class="example-pinyin">' + esc(state.surname.pinyin + " " + example.pinyinDisplay) +
-        "</div>" +
+        '<div class="example-pinyin">' + esc(example.fullPinyinDisplay) + "</div>" +
         '<div class="example-origin">名例 · ' + esc(example.origin) + "</div>" +
         '<p class="example-note">' + esc(example.note) + "</p>" +
         "</article>";
