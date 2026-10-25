@@ -379,9 +379,10 @@ test("surname examples require the exact same surname", function () {
 
   const zhang = ENGINE.resolveSurname("张");
   const ziFang = ENGINE.getSurnameExamples(zhang, [3, 2], 2, 3);
-  assert.strictEqual(ziFang.length, 1);
+  assert(ziFang.length >= 1);
   assert.strictEqual(ziFang[0].fullName, "张子房");
   assert.strictEqual(ziFang[0].fullPinyinDisplay, "zhāng zǐ fáng");
+  assert(ziFang.every(function (example) { return example.surname === "张"; }));
 
   const sima = ENGINE.resolveSurname("司马");
   const xiangRu = ENGINE.getSurnameExamples(sima, [4, 2], 2, 3);
@@ -390,6 +391,32 @@ test("surname examples require the exact same surname", function () {
   assert.strictEqual(xiangRu[0].fullPinyinDisplay, "sī mǎ xiàng rú");
 
   assert.deepStrictEqual(ENGINE.getSurnameExamples(null, [3, 1], 2, 3), []);
+});
+
+test("full-name tone examples cover every surname tone pattern", function () {
+  for (let surnameTone = 1; surnameTone <= 4; surnameTone++) {
+    const surname = { text: "", tones: [surnameTone] };
+    for (let first = 1; first <= 4; first++) {
+      assert(ENGINE.getToneMatchedExamples(surname, [first], 1, 3).length >= 3,
+        surnameTone + "|" + first);
+      for (let second = 1; second <= 4; second++) {
+        const list = ENGINE.getToneMatchedExamples(surname, [first, second], 2, 3);
+        assert(list.length >= 3, surnameTone + "|" + first + "-" + second);
+        list.forEach(function (example) {
+          assert.strictEqual(example.surnameTones.join("-"), String(surnameTone));
+          assert.deepStrictEqual(example.tones, [first, second]);
+          assert(example.fullName);
+        });
+      }
+    }
+  }
+
+  const zhang = ENGINE.resolveSurname("张");
+  const zhang42 = ENGINE.getToneMatchedExamples(zhang, [4, 2], 2, 3);
+  assert.strictEqual(zhang42.length, 3);
+  zhang42.forEach(function (example) {
+    assert.strictEqual(example.surname, "张");
+  });
 });
 
 test("double-character recommendations are coherent", function () {

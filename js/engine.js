@@ -172,6 +172,18 @@
     }).slice(0, limit || 3);
   }
 
+  function getToneMatchedExamples(surname, givenTones, nameLength, limit) {
+    if (!surname || !surname.tones) return [];
+    const surnameTarget = surname.tones.join("-");
+    const givenTarget = givenTones.join("-");
+    return NAMING_EXAMPLES.filter(function (example) {
+      return example.fullName &&
+        example.surnameTones.join("-") === surnameTarget &&
+        example.length === nameLength &&
+        example.tones.join("-") === givenTarget;
+    }).slice(0, limit || 3);
+  }
+
   function resolveSurname(input, manualReading) {
     const text = String(input || "").trim();
     if (!text) {
@@ -1039,6 +1051,7 @@
     imageryAvailability: imageryAvailability,
     getNamingExamples: getNamingExamples,
     getSurnameExamples: getSurnameExamples,
+    getToneMatchedExamples: getToneMatchedExamples,
     recommendNames: recommendNames,
     BLOCKED_NAMES: BLOCKED_NAMES,
     LOW_PRIORITY_FACTOR: LOW_PRIORITY_FACTOR

@@ -405,14 +405,14 @@
       if (own.length >= 3) return { own: own, examples: own.slice(0, 3) };
       const used = {};
       own.forEach(function (example) { used[example.fullName] = true; });
-      const extras = ENGINE.getNamingExamples(
+      const extras = ENGINE.getToneMatchedExamples(
+        state.surname,
         option.givenTones,
         state.nameLength,
         20
       ).filter(function (example) {
-        return example.fullName &&
-          !used[example.fullName] &&
-          example.surname !== state.surname.text;
+        return example.surname !== state.surname.text &&
+          !used[example.fullName];
       });
       return { own: own, examples: own.concat(extras).slice(0, 3) };
     };
@@ -434,13 +434,16 @@
       .concat(toneOption.givenTones)
       .map(ENGINE.toneName)
       .join(" · ");
-    const typeLabels = { 史: "历史人物", 文: "文学形象", 诗: "诗文意象" };
+    const ownNames = {};
+    collected.own.forEach(function (example) { ownNames[example.fullName] = true; });
     let subtitleText = "全名声调 " + fullToneNames;
     if (ownCount) {
       subtitleText = "与「" + surnameText + "」同姓 " + ownCount + " 例 · " + subtitleText;
-      if (examples.length > ownCount) subtitleText += " · 补入原姓名例";
+      if (examples.length > ownCount) {
+        subtitleText += " · 另补同调原名（不改姓）" + (examples.length - ownCount) + " 例";
+      }
     } else {
-      subtitleText = "暂无与「" + surnameText + "」同姓的名例 · 以下保留原姓 · " +
+      subtitleText = "暂无与「" + surnameText + "」同姓的名例 · 以下为同调原名（不改姓） · " +
         subtitleText;
     }
     subtitle.textContent = (state.toneOption ? "" :
@@ -456,8 +459,10 @@
       return '<article class="example-card">' +
         '<div class="example-top"><span class="example-name">' +
         esc(example.fullName) +
-        '</span><span class="example-type" title="' + esc(typeLabels[example.type] || "名例") +
-        '">' + esc(example.type) + "</span></div>" +
+        '</span><span class="example-type" title="' +
+        esc(ownNames[example.fullName] ? "与输入姓氏同名" : "全名声调相同、保留原姓") +
+        '">' + esc((ownNames[example.fullName] ? "同姓" : "同调") + " · " + example.type) +
+        "</span></div>" +
         '<div class="example-pinyin">' + esc(example.fullPinyinDisplay) + "</div>" +
         '<div class="example-origin">名例 · ' + esc(example.origin) + "</div>" +
         '<p class="example-note">' + esc(example.note) + "</p>" +
