@@ -83,6 +83,7 @@
       "slip-tones", "slip-syllables", "slip-imagery", "slip-progress-value",
       "slip-progress-bar", "slip-review", "tone-surname", "tone-context-name",
       "tone-context-length", "tone-grid", "tone-continue", "chosen-tone-value",
+      "tone-examples-panel", "tone-examples-subtitle", "tone-examples-strip",
       "syllable-search", "syllable-grid", "syllable-empty", "syllable-count",
       "syllable-more", "syllable-continue", "examples-panel", "examples-subtitle",
       "examples-strip", "imagery-syllables",
@@ -330,6 +331,7 @@
         '<span class="tone-reason">' + esc(reasons) + "</span></button>";
     }).join("");
     els.toneContinue.disabled = !state.toneOption;
+    renderToneExamples();
   }
 
   function ensureSyllableOptions() {
@@ -366,9 +368,9 @@
       " / " + state.toneOption.pingZe.join("");
   }
 
-  function renderNamingExamples() {
+  function renderExamplesInto(panel, subtitle, strip) {
     if (!state.toneOption || !state.surname) {
-      els.examplesPanel.hidden = true;
+      panel.hidden = true;
       return;
     }
     const examples = ENGINE.getNamingExamples(
@@ -377,7 +379,7 @@
       3
     );
     if (!examples.length) {
-      els.examplesPanel.hidden = true;
+      panel.hidden = true;
       return;
     }
     const surnameText = state.surname.text;
@@ -386,9 +388,9 @@
       .map(ENGINE.toneName)
       .join(" · ");
     const typeLabels = { 史: "历史人物", 文: "文学形象", 诗: "诗文意象" };
-    els.examplesSubtitle.textContent = "与「" + surnameText + "」连读 · 全名声调 " +
+    subtitle.textContent = "与「" + surnameText + "」连读 · 全名声调 " +
       fullToneNames;
-    els.examplesStrip.innerHTML = examples.map(function (example) {
+    strip.innerHTML = examples.map(function (example) {
       return '<article class="example-card">' +
         '<div class="example-top"><span class="example-name">' +
         '<span class="example-surname">' + esc(surnameText) + "</span>" +
@@ -401,7 +403,19 @@
         '<p class="example-note">' + esc(example.note) + "</p>" +
         "</article>";
     }).join("");
-    els.examplesPanel.hidden = false;
+    panel.hidden = false;
+  }
+
+  function renderNamingExamples() {
+    renderExamplesInto(els.examplesPanel, els.examplesSubtitle, els.examplesStrip);
+  }
+
+  function renderToneExamples() {
+    renderExamplesInto(
+      els.toneExamplesPanel,
+      els.toneExamplesSubtitle,
+      els.toneExamplesStrip
+    );
   }
 
   function renderSyllableList() {
